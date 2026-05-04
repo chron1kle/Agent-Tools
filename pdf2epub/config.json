@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "description": "PDF转EPUB工具配置文件",
+
+  "api": {
+    "provider": "anthropic",
+    "api_key": "",
+    "base_url": "",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 8192
+  },
+
+  "correction": {
+    "use_rule_based": true,
+    "use_llm": false,
+    "llm_start_page": 1,
+    "llm_end_page": null
+  },
+
+  "epub": {
+    "add_page_markers": true,
+    "default_author": "Unknown",
+    "chapters": []
+  },
+
+  "output": {
+    "default_dir": "out"
+  }
+}
