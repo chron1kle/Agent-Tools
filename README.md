@@ -4,23 +4,52 @@
 
 ---
 
-## 项目目标
+## 项目愿景
 
-建立一套标准化的 Agent Tools 开发规范，让不同语言、不同功能的 AI 工具能够：
+建立一套标准化的 Agent Tools 开发框架，实现统一入口、单例模式、多语言支持。
 
-1. **统一结构** - 遵循相同的目录组织和配置文件格式
-2. **LLM 集成** - 支持通过 MCP 协议被 LLM 直接调用
-3. **可观测** - 通过统一的日志系统实时追踪工具运行状态
-4. **跨语言** - 提供各语言的通用组件（Python 优先）
+## 核心文档
+
+| 文档 | 定位 | 说明 |
+|------|------|------|
+| [AGENT_TOOL_STANDARD.md](./AGENT_TOOL_STANDARD.md) | 项目架构 | 整体架构设计、核心决策 |
+| [demo-tool/](./demo-tool/) | 工具模板 | 工具实现模板、使用指南 |
+| [maintenance.md](./maintenance.md) | 维护手册 | 文档维护规范 |
 
 ---
 
-## 核心规范
+## 快速开始
 
-| 文档 | 说明 |
+### 创建新工具
+
+```bash
+# 1. 复制模板
+cp -r demo-tool/ my-tool/
+
+# 2. 重命名并编辑占位符
+cd my-tool
+# 编辑 src/__init__.py，替换 {{TOOL_NAME}}
+
+# 3. 实现工具逻辑
+# 编辑 src/main.py
+
+# 4. 启动工具
+python -m my_tool.src --mcp
+```
+
+---
+
+## 架构概览
+
+```
+Claude Desktop ──MCP──> __init__.py (单例) ──> Tool 实现
+```
+
+| 特性 | 说明 |
 |------|------|
-| [AGENT_TOOL_STANDARD.md](./AGENT_TOOL_STANDARD.md) | Agent Tool 构建规范（必读） |
-| [common/logger/README.md](./common/logger/README.md) | 日志系统架构设计 |
+| 统一入口 | 所有工具通过 `src/__init__.py` 调用 |
+| 单例模式 | Claude 控制工具生命周期 |
+| MCP 主要接口 | 生产环境使用 MCP 模式 |
 
 ---
 
@@ -28,71 +57,26 @@
 
 ```
 Agent-Tools/
-├── AGENT_TOOL_STANDARD.md    # 架构规范文档
-├── .gitignore                # Git 忽略配置
-├── README.md                 # 本文件
-├── pdf2epub/                 # 参考实现（PDF 转 EPUB）
-│   ├── config.json
-│   ├── src/
-│   └── manual.md
-└── common/                   # 通用组件
-    └── logger/              # 日志组件
-        └── python/          # Python 实现
+├── AGENT_TOOL_STANDARD.md  # 项目架构文档
+├── README.md               # 本文件
+├── maintenance.md          # 维护手册
+├── demo-tool/            # 工具模板
+├── pdf2epub/             # 参考实现
+└── common/               # 公共组件
+    ├── logger/
+    └── conf-env-reg/
 ```
-
----
-
-## 快速开始
-
-### 1. 创建新工具
-
-按照 [AGENT_TOOL_STANDARD.md](./AGENT_TOOL_STANDARD.md) 创建目录结构：
-
-```
-my-tool/
-├── config.json
-├── README.md
-├── .gitignore
-└── src/
-    └── __init__.py
-```
-
-### 2. 可选：集成日志
-
-```python
-from common.logger.python import Logger
-
-logger = Logger({"port": 8765})
-logger.info("task_start", {"file": "input.pdf"})
-```
-
-监听日志：
-```bash
-telnet localhost 8765
-```
-
-### 3. 可选：集成 MCP
-
-实现 `src/mcp_server.py`，让工具可以被 LLM 直接调用。
-
----
-
-## 参考实现
-
-| 工具 | 说明 |
-|------|------|
-| [pdf2epub](./pdf2epub/) | PDF 转 EPUB，支持 OCR 纠错和 LLM 校正 |
 
 ---
 
 ## 组件状态
 
-| 组件 | 语言 | 状态 |
-|------|------|------|
-| Logger | Python | ✅ 可用 |
-| Logger | Node.js | ⏳ 待实现 |
-| Logger | Go | ⏳ 待实现 |
-| Logger | Rust | ⏳ 待实现 |
+| 组件 | 状态 |
+|------|------|
+| conf-env-reg (Python) | ✅ 可用 |
+| Logger (Python) | ✅ 可用 |
+| Logger (Node.js) | ⏳ 待实现 |
+| Logger (Go) | ⏳ 待实现 |
 
 ---
 

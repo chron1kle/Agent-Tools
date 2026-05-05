@@ -14,11 +14,28 @@ class LogLevel(IntEnum):
     ERROR = 3
 
 
+def _load_config_from_env() -> dict:
+    """从环境变量加载日志配置"""
+    config = {}
+    config["enabled"] = os.environ.get("AGENT_LOGGER_ENABLED", "true").lower() == "true"
+    config["host"] = os.environ.get("AGENT_LOGGER_HOST", "localhost")
+    config["port"] = int(os.environ.get("AGENT_LOGGER_PORT", "8765"))
+    config["level"] = os.environ.get("AGENT_LOGGER_LEVEL", "INFO")
+    return config
+
+
 class SocketLogger:
     """基于 TCP Socket 的日志组件，支持多客户端广播"""
 
     def __init__(self, config: Optional[dict] = None):
-        config = config or {}
+        # 优先使用传入的 config，其次使用环境变量
+        if config is None:
+            config = _load_config_from_env()
+        else:
+            # 如果传入了 config，仍然可以覆盖环境变量设置
+            env_config = _load_config_from_env()
+            config = {**env_config, **config}  # 环境变量作为默认值，传入参数覆盖
+
         self.enabled = config.get("enabled", True)
         self.host = config.get("host", "localhost")
         self.port = config.get("port", 8765)

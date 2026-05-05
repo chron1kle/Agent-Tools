@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "description": "{{TOOL_NAME}} - 一句话描述",
+  "log": {
+    "enabled": true,
+    "host": "localhost",
+    "port": 8765,
+    "level": "INFO"
+  },
+  "output": {
+    "default_dir": "out"
+  }
+}
