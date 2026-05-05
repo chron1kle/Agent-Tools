@@ -69,6 +69,27 @@ demo-tool/
 |------|------|------|
 | Logger | `common/logger/python/` | TCP 日志广播 |
 | Config Env Reg | `common/conf-env-reg/python/` | 配置注册为环境变量 |
+| Task Queue | `common/task-queue/python/` | 并发任务队列、工作池 |
+
+#### Task Queue 配置
+
+```json
+{
+  "task_queue": {
+    "max_workers": 3,
+    "progress_interval": 1.0,
+    "task_timeout": 3600,
+    "queue_max_size": 100
+  }
+}
+```
+
+| 配置项 | 说明 |
+|--------|------|
+| max_workers | 最大并发数 |
+| progress_interval | 进度报告间隔（秒） |
+| task_timeout | 任务超时时间（秒） |
+| queue_max_size | 队列最大大小 |
 
 ---
 

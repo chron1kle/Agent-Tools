@@ -1,0 +1,65 @@
+{
+  "id": "pdf-to-book",
+  "name": "PDF 转电子书工作流",
+  "description": "将 PDF 转换为带目录和元数据的电子书",
+  "version": "1.0",
+  "inputs": [
+    {
+      "name": "pdf_file",
+      "type": "string",
+      "description": "输入 PDF 文件路径",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "description": "书籍标题",
+      "required": false
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "description": "书籍作者",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "epub_file",
+      "type": "string",
+      "description": "输出的 EPUB 文件路径"
+    }
+  ],
+  "steps": [
+    {
+      "id": "extract",
+      "name": "提取 PDF 文本",
+      "tool": "pdf2epub",
+      "input_mapping": {
+        "input": "$.inputs.pdf_file",
+        "title": "$.inputs.title",
+        "author": "$.inputs.author"
+      },
+      "output_mapping": {
+        "output": "epub_file"
+      },
+      "depends_on": [],
+      "error_strategy": "retry",
+      "retry": {
+        "max_attempts": 3,
+        "initial_delay": 1.0,
+        "backoff_factor": 2.0
+      }
+    },
+    {
+      "id": "validate",
+      "name": "验证输出",
+      "tool": "validator",
+      "input_mapping": {
+        "file": "$.steps.extract.outputs.epub_file"
+      },
+      "depends_on": ["extract"],
+      "error_strategy": "skip"
+    }
+  ]
+}

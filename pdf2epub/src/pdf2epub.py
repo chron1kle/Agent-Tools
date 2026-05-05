@@ -10,7 +10,47 @@ import os
 import re
 import sys
 import argparse
+import time
+import threading
 from html import escape
+
+
+# ============== 进度报告 ==============
+
+class ProgressReporter:
+    """进度报告器 - 每秒输出 JSON 进度"""
+
+    def __init__(self):
+        self.progress = 0.0
+        self.message = ""
+        self._last_report_time = 0
+        self._report_interval = 1.0  # 每秒报告一次
+
+    def update(self, progress: float, message: str = ""):
+        """更新进度"""
+        self.progress = progress
+        self.message = message
+        self._report()
+
+    def _report(self):
+        """输出进度到 stdout（JSON 格式）"""
+        current_time = time.time()
+        if current_time - self._last_report_time >= self._report_interval:
+            self._last_report_time = current_time
+            output = {
+                "type": "progress",
+                "progress": self.progress,
+                "message": self.message
+            }
+            print(json.dumps(output, ensure_ascii=False))
+
+    def done(self, message: str = "完成"):
+        """完成"""
+        self.update(100.0, message)
+
+
+# 全局进度报告器
+progress = ProgressReporter()
 
 
 # ============== 配置管理 ==============
@@ -574,9 +614,12 @@ def main():
         if input_type != 'pdf':
             print("错误: --step1-extract 需要PDF输入")
             sys.exit(1)
+        progress.update(10.0, "正在提取 PDF 文本...")
         json_path = input_file.replace('.pdf', '.json')
         data = extract_text_json(input_file)
+        progress.update(30.0, "正在保存文本...")
         save_json(data, json_path)
+        progress.done("文本提取完成")
         print(f"文本已提取到: {json_path}")
         return
 
@@ -585,10 +628,13 @@ def main():
         if input_type != 'json':
             print("错误: --step2-correct 需要JSON输入")
             sys.exit(1)
+        progress.update(40.0, "正在规则纠错...")
         data = load_json(input_file)
         data = correct_json_data(data)
+        progress.update(70.0, "正在保存...")
         corrected_path = input_file.replace('.json', '_corrected.json')
         save_json(data, corrected_path)
+        progress.done("纠错完成")
         print(f"纠错完成: {corrected_path}")
         return
 
@@ -597,6 +643,7 @@ def main():
         if input_type != 'json':
             print("错误: --step3-epub 需要JSON输入")
             sys.exit(1)
+        progress.update(50.0, "正在生成 EPUB...")
         data = load_json(input_file)
 
         # 解析章节
@@ -617,6 +664,7 @@ def main():
         author = args.author or "Unknown"
 
         generate_epub(data, output_dir, title, author, chapters)
+        progress.update(80.0, "正在打包 EPUB...")
 
         # 打包EPUB
         epub_path = os.path.join(os.path.dirname(output_dir), f"{title}.epub")
@@ -629,15 +677,18 @@ def main():
             f'Compress-Archive -Path "{output_dir}\\mimetype","{output_dir}\\META-INF","{output_dir}\\OEBPS" -DestinationPath "{epub_path}" -Force'
         ], capture_output=True)
 
+        progress.done("EPUB 生成完成")
         print(f"EPUB已生成: {epub_path}")
         return
 
     # 一键模式: PDF -> JSON -> 规则纠错 -> LLM校正 -> EPUB
     if input_type == 'pdf':
+        progress.update(10.0, "正在从 PDF 提取文本...")
         print(f"步骤1: 从PDF提取文本...")
         json_path = os.path.join(output_dir, os.path.basename(input_file).replace('.pdf', '.json'))
         data = extract_text_json(input_file)
         save_json(data, json_path)
+        progress.update(30.0, "正在 OCR 规则纠错...")
 
         if not args.no_correction:
             print("步骤2: OCR规则纠错...")
@@ -645,6 +696,7 @@ def main():
             corrected_path = json_path.replace('.json', '_corrected.json')
             save_json(data, corrected_path)
             json_path = corrected_path
+        progress.update(60.0, "正在生成 EPUB...")
     else:
         json_path = input_file
         data = load_json(json_path)
@@ -684,6 +736,7 @@ def main():
             sys.exit(1)
 
         llm_output = json_path.replace('.json', '_llm.json')
+        progress.update(70.0, "正在进行 LLM 智能校正...")
         correct_json_file(
             json_path,
             llm_output,
@@ -696,8 +749,10 @@ def main():
         json_path = llm_output
         data = load_json(json_path)
 
+        progress.update(80.0, "正在生成 EPUB...")
         print("步骤4: 生成EPUB...")
     else:
+        progress.update(70.0, "正在生成 EPUB...")
         print("步骤3: 生成EPUB...")
 
     # 解析章节
@@ -763,11 +818,13 @@ def main():
         os.remove(epub_path)
 
     import subprocess
+    progress.update(90.0, "正在打包 EPUB...")
     subprocess.run([
         'powershell', '-Command',
         f'Compress-Archive -Path "{output_dir}\\mimetype","{output_dir}\\META-INF","{output_dir}\\OEBPS" -DestinationPath "{epub_path}" -Force'
     ], capture_output=True)
 
+    progress.done("转换完成")
     print(f"\n完成! EPUB: {epub_path}")
 
 

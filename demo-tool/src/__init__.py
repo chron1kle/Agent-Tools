@@ -36,6 +36,7 @@ import json
 import signal
 import time
 import threading
+import asyncio
 from pathlib import Path
 from typing import Optional, List
 
@@ -107,6 +108,19 @@ TOOL_SCHEMA = {
     }
 }
 
+# ============ 任务队列 ============
+
+# 使用通用任务队列组件
+try:
+    from common.task_queue.python import TaskQueue, get_queue_config
+
+    # 从环境变量读取配置
+    task_config = get_queue_config("{{TOOL_NAME|upper}}")
+    task_queue = TaskQueue(config=task_config)
+except ImportError:
+    # 如果没有通用组件，设为 None
+    task_queue = None
+
 # ============ 工具类 ============
 # TODO: 定义你的工具类，用于单例模式
 # 示例：
@@ -115,12 +129,9 @@ TOOL_SCHEMA = {
 #         self.running = False
 #     def start(self):
 #         self.running = True
-#         print("Tool started")
 #     def stop(self):
 #         self.running = False
-#         print("Tool stopped")
 #     def execute(self, args):
-#         print(f"Executing: {args}")
 #         return {"result": "done"}
 
 class ToolPlaceholder:
@@ -129,21 +140,17 @@ class ToolPlaceholder:
         self.running = False
 
     def start(self):
-        """启动工具"""
         self.running = True
         print("Tool started")
 
     def stop(self):
-        """停止工具"""
         self.running = False
         print("Tool stopped")
 
     def status(self) -> dict:
-        """查询状态"""
         return {"running": self.running}
 
     def execute(self, args: List[str]) -> dict:
-        """执行任务"""
         print(f"Executing: {args}")
         return {"result": "success", "args": args}
 
@@ -170,7 +177,6 @@ class ToolManager:
 
     @classmethod
     def start(cls):
-        """启动工具"""
         if cls._tool is None:
             cls._tool = TOOL_CLASS()
         cls._tool.start()
@@ -178,28 +184,24 @@ class ToolManager:
 
     @classmethod
     def stop(cls):
-        """停止工具"""
         if cls._tool:
             cls._tool.stop()
         return {"status": "stopped"}
 
     @classmethod
     def status(cls) -> dict:
-        """查询状态"""
         if cls._tool:
             return cls._tool.status()
         return {"running": False}
 
     @classmethod
     def execute(cls, args: List[str]) -> dict:
-        """执行任务"""
         if cls._tool is None:
             cls._tool = TOOL_CLASS()
         return cls._tool.execute(args)
 
     @classmethod
     def restart(cls):
-        """重启工具"""
         cls.stop()
         time.sleep(0.5)
         cls.start()
@@ -209,112 +211,56 @@ class ToolManager:
 # ============ 核心功能 ============
 
 def get_implementation() -> Optional[str]:
-    """
-    自动检测可用的语言实现
-
-    Returns:
-        str: 语言名称，如 "python", "nodejs"
-        None: 未找到任何实现
-    """
     src_dir = Path(__file__).parent
-
     for lang in LANGUAGE_PRIORITY:
         entry_file = src_dir / LANGUAGE_ENTRY[lang]
         if entry_file.exists():
             return lang
-
     print(f"Error: No implementation found in src/", file=sys.stderr)
-    print(f"Expected one of: {', '.join(LANGUAGE_ENTRY.values())}", file=sys.stderr)
-    print(f"Checked priority: {', '.join(LANGUAGE_PRIORITY)}", file=sys.stderr)
     return None
 
 
 def run_command(lang: str, args: List[str]) -> int:
-    """
-    运行指定语言的实现
-
-    Args:
-        lang: 语言名称
-        args: 命令行参数
-
-    Returns:
-        int: 退出码
-    """
     src_dir = Path(__file__).parent
     entry_file = src_dir / LANGUAGE_ENTRY[lang]
-
     if lang == "python":
         cmd = [sys.executable, str(entry_file)] + args
         return subprocess.call(cmd, cwd=str(src_dir))
-
     elif lang == "nodejs":
         cmd = ["node", str(entry_file)] + args
         return subprocess.call(cmd, cwd=str(src_dir))
-
     elif lang == "go":
         return subprocess.call([str(entry_file)] + args, cwd=str(src_dir))
-
     elif lang == "rust":
         return subprocess.call([str(entry_file)] + args, cwd=str(src_dir))
-
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
 
 def run(*args, lang: Optional[str] = None, config_path: Optional[str] = None):
-    """
-    运行工具
-
-    Args:
-        *args: 命令行参数，如 "--input", "file.pdf"
-        lang: 指定语言，不指定则自动检测
-        config_path: 指定配置文件路径，默认使用工具目录下的 config.json
-
-    Returns:
-        int: 退出码
-    """
-    # 如果未指定语言，自动检测
     if lang is None:
         lang = get_implementation()
         if lang is None:
             return 1
-
-    # 如果指定了自定义配置文件，重新加载配置
-    if config_path:
-        try:
-            from common.conf_env_reg.python import setup_env_from_config
-            setup_env_from_config(config_path, prefix="{{TOOL_NAME|upper}}")
-        except ImportError:
-            pass
-
-    # 转换为列表
     args_list = list(args) if args else []
-
-    # 运行
     return run_command(lang, args_list)
 
 
 def _convert_mcp_args(mcp_args: dict) -> List[str]:
-    """
-    将 MCP 参数转换为命令行参数
-
-    Args:
-        mcp_args: MCP 传入的参数字典
-
-    Returns:
-        List[str]: 命令行参数列表
-    """
     args = []
     for key, value in mcp_args.items():
         if value is not None:
-            args.extend([f"--{key}", str(value)])
+            if isinstance(value, bool):
+                if value:
+                    args.append(f"--{key}")
+            else:
+                args.extend([f"--{key}", str(value)])
     return args
 
 
 # ============ MCP Server ============
 
 def create_mcp_server():
-    """创建 MCP Server"""
     try:
         from mcp.server import Server
         from mcp.types import Tool, TextContent
@@ -340,7 +286,7 @@ def create_mcp_server():
     @app.call_tool()
     async def call_tool(name: str, arguments: dict):
         if name == "run":
-            # 检查是否是生命周期管理命令
+            # 生命周期管理
             if arguments.get("_action") == "start":
                 result = ToolManager.start()
                 return [TextContent(type="text", json.dumps(result))]
@@ -353,8 +299,15 @@ def create_mcp_server():
             elif arguments.get("_action") == "restart":
                 result = ToolManager.restart()
                 return [TextContent(type="text", json.dumps(result))]
+            elif arguments.get("_action") == "tasks":
+                # 列出所有任务
+                if task_queue:
+                    tasks = await task_queue.list_tasks()
+                    result = {"tasks": [t.to_dict() for t in tasks]}
+                else:
+                    result = {"tasks": []}
+                return [TextContent(type="text", json.dumps(result))]
             else:
-                # 普通执行
                 cli_args = _convert_mcp_args(arguments)
                 result = ToolManager.execute(cli_args)
                 return [TextContent(type="text", json.dumps(result))]
@@ -364,8 +317,19 @@ def create_mcp_server():
 
 
 async def run_mcp_server():
-    """启动 MCP Server"""
     app, stdio_server = create_mcp_server()
+
+    # 添加进度日志回调
+    if task_queue:
+        async def progress_callback(task):
+            print(json.dumps({
+                "type": "progress",
+                "task_id": task.id,
+                "progress": task.progress,
+                "message": task.message
+            }))
+        task_queue.add_progress_callback(progress_callback)
+
     async with stdio_server() as streams:
         await app.run(
             streams[0],
@@ -375,45 +339,20 @@ async def run_mcp_server():
 
 
 def main():
-    """命令行入口"""
     parser = argparse.ArgumentParser(description="{{TOOL_NAME}} - {{ONE_LINE_DESCRIPTION}}")
 
-    # 生命周期管理参数
     parser.add_argument("--start", action="store_true", help="启动工具进程")
     parser.add_argument("--stop", action="store_true", help="停止工具进程")
     parser.add_argument("--status", action="store_true", help="查询工具状态")
     parser.add_argument("--restart", action="store_true", help="重启工具进程")
 
-    # MCP 模式
-    parser.add_argument(
-        "--mcp",
-        action="store_true",
-        help="启动 MCP 服务器模式"
-    )
-
-    # 语言选择
-    parser.add_argument(
-        "--lang", "-l",
-        choices=LANGUAGE_PRIORITY,
-        help="指定实现语言，默认自动检测"
-    )
-
-    # 配置文件
-    parser.add_argument(
-        "--config", "-c",
-        help="指定配置文件路径"
-    )
-
-    # 传递给底层实现的参数
-    parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        help="传递给底层实现的参数"
-    )
+    parser.add_argument("--mcp", action="store_true", help="启动 MCP 服务器模式")
+    parser.add_argument("--lang", "-l", choices=LANGUAGE_PRIORITY, help="指定实现语言")
+    parser.add_argument("--config", "-c", help="指定配置文件路径")
+    parser.add_argument("args", nargs=argparse.REMAINDER, help="传递给底层实现的参数")
 
     parsed = parser.parse_args()
 
-    # 生命周期管理
     if parsed.start:
         result = ToolManager.start()
         print(json.dumps(result))
@@ -434,21 +373,13 @@ def main():
         print(json.dumps(result))
         return
 
-    # MCP 模式
     if parsed.mcp:
         import asyncio
         asyncio.run(run_mcp_server())
         return
 
-    # 普通模式
-    exit_code = run(
-        *parsed.args,
-        lang=parsed.lang,
-        config_path=parsed.config
-    )
+    exit_code = run(*parsed.args, lang=parsed.lang, config_path=parsed.config)
     sys.exit(exit_code)
 
-
-# ============ 导出 ============
 
 __all__ = ["run", "main", "get_implementation", "ToolManager"]
