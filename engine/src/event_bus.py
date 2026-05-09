@@ -1,5 +1,5 @@
 """
-Event Bus - 事件系统
+Event Bus - 事件总线
 """
 
 import asyncio
@@ -26,12 +26,11 @@ class Event:
     """事件"""
     type: EventType
     data: Dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
 
 class EventBus:
-    """
-    事件总线
+    """事件总线
 
     支持事件发布和订阅。
     """
@@ -77,5 +76,5 @@ class EventBus:
         return self._history.copy()
 
 
-# 全局事件总线
+# 模块级单例
 event_bus = EventBus()

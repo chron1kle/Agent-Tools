@@ -1,8 +1,7 @@
 """
-Workflow Engine - 工作流定义与模型
+Workflow Definition - 工作流定义
 """
 
-import uuid
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
@@ -14,7 +13,6 @@ class ErrorStrategy(Enum):
     SKIP = "skip"
     FALLBACK = "fallback"
     ABORT = "abort"
-    COMPENSATE = "compensate"
 
 
 class StepStatus(Enum):
@@ -24,33 +22,6 @@ class StepStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"
-
-
-class WorkflowStatus(Enum):
-    """工作流状态"""
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-@dataclass
-class Input:
-    """工作流输入定义"""
-    name: str
-    type: str
-    description: str
-    required: bool = True
-    default: Any = None
-
-
-@dataclass
-class Output:
-    """工作流输出定义"""
-    name: str
-    type: str
-    description: str
 
 
 @dataclass
@@ -64,16 +35,20 @@ class RetryConfig:
 
 @dataclass
 class Step:
-    """工作流步骤定义"""
-    id: str
-    name: str
-    tool: str
-    input_mapping: Dict[str, str] = field(default_factory=dict)
-    output_mapping: Dict[str, str] = field(default_factory=dict)
-    depends_on: List[str] = field(default_factory=list)
-    condition: Optional[str] = None
-    error_strategy: ErrorStrategy = ErrorStrategy.RETRY
-    retry: RetryConfig = field(default_factory=RetryConfig)
+    """工作流步骤定义
+
+    一个步骤对应一个工具（tool_id），步骤之间的依赖通过 depends_on 定义。
+    步骤执行时会创建一个 Task，Task 的状态流转由该工具的 JudgmentManual 定义。
+    """
+    id: str                           # 步骤 ID
+    name: str                         # 步骤名称
+    tool_id: str                      # 工具 ID（对应 JudgmentManual）
+    input_mapping: Dict[str, str] = field(default_factory=dict)   # 输入映射
+    output_mapping: Dict[str, str] = field(default_factory=dict)  # 输出映射
+    depends_on: List[str] = field(default_factory=list)          # 依赖步骤
+    condition: Optional[str] = None                               # 执行条件
+    error_strategy: ErrorStrategy = ErrorStrategy.RETRY           # 错误策略
+    retry: RetryConfig = field(default_factory=RetryConfig)       # 重试配置
 
 
 @dataclass
@@ -83,10 +58,27 @@ class Workflow:
     name: str
     description: str
     version: str = "1.0"
-    inputs: List[Input] = field(default_factory=list)
-    outputs: List[Output] = field(default_factory=list)
+    inputs: List[Any] = field(default_factory=list)   # 简化：只需定义
+    outputs: List[Any] = field(default_factory=list)
     steps: List[Step] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def get_step(self, step_id: str) -> Optional[Step]:
+        """获取步骤"""
+        for step in self.steps:
+            if step.id == step_id:
+                return step
+        return None
+
+    def get_ready_steps(self, completed_steps: set) -> List[Step]:
+        """获取所有依赖已满足的就绪步骤"""
+        ready = []
+        for step in self.steps:
+            if step.id in completed_steps:
+                continue
+            if all(dep in completed_steps for dep in step.depends_on):
+                ready.append(step)
+        return ready
 
     def to_dict(self) -> dict:
         return {
@@ -94,44 +86,14 @@ class Workflow:
             "name": self.name,
             "description": self.description,
             "version": self.version,
-            "inputs": [i.__dict__ for i in self.inputs],
-            "outputs": [o.__dict__ for o in self.outputs],
             "steps": [
                 {
                     "id": s.id,
                     "name": s.name,
-                    "tool": s.tool,
+                    "tool_id": s.tool_id,
                     "depends_on": s.depends_on,
-                    "error_strategy": s.error_strategy.value
+                    "error_strategy": s.error_strategy.value,
                 }
                 for s in self.steps
             ]
-        }
-
-
-@dataclass
-class WorkflowInstance:
-    """工作流实例"""
-    id: str
-    workflow_id: str
-    status: WorkflowStatus = WorkflowStatus.PENDING
-    inputs: Dict[str, Any] = field(default_factory=dict)
-    outputs: Dict[str, Any] = field(default_factory=dict)
-    step_states: Dict[str, StepStatus] = field(default_factory=dict)
-    step_outputs: Dict[str, Any] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "workflow_id": self.workflow_id,
-            "status": self.status.value,
-            "inputs": self.inputs,
-            "outputs": self.outputs,
-            "step_states": {k: v.value for k, v in self.step_states.items()},
-            "errors": self.errors,
-            "started_at": self.started_at,
-            "completed_at": self.completed_at
         }

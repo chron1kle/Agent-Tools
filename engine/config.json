@@ -10,12 +10,46 @@
     "enabled": true,
     "host": "localhost",
     "port": 8766,
-    "level": "INFO"
+    "level": "INFO",
+    "dir": "./logs"
   },
   "task_queue": {
     "max_workers": 3,
     "progress_interval": 1.0,
     "task_timeout": 3600,
     "queue_max_size": 100
+  },
+  "llm": {
+    "model_types": {
+      "general": {
+        "active": 1,
+        "provider": "anthropic",
+        "model_name": "gpt-5.4-nano",
+        "api_key": "sk-VMtysogRYr2OGFjtt5KKss0EIzlt3uueIdYEQPTAw8dUPMxr",
+        "base_url": "https://api.1314mc.net",
+        "max_tokens": 116608,
+        "temperature": 0.7,
+        "timeout": 60
+      },
+      "inference": {
+        "active": 0,
+        "provider": "anthropic",
+        "model_name": "MiniMax-M2.7-highspeed",
+        "api_key": "sk-24e09011af628e07665dad91828dd702",
+        "base_url": "https://v2.aicodee.com/",
+        "max_tokens": 196608,
+        "temperature": 0.5,
+        "timeout": 60
+      },
+      "documentation": {
+        "provider": "openai",
+        "model_name": "gpt-4o-mini",
+        "api_key": "${OPENAI_API_KEY}",
+        "base_url": "https://api.openai.com/v1",
+        "max_tokens": 8192,
+        "temperature": 0.6,
+        "timeout": 60
+      }
+    }
   }
 }

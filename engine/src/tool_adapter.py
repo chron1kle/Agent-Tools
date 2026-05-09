@@ -26,34 +26,25 @@ class ToolResult:
 
 
 class ToolAdapter(ABC):
-    """工具适配器基类"""
+    """工具适配器基类
+
+    所有工具都必须实现此接口。
+    工具适配器负责：
+    - 执行具体业务逻辑
+    - 验证输入
+    - 返回执行结果
+    """
 
     name: str = "base_tool"
     version: str = "1.0"
 
     @abstractmethod
     async def execute(self, inputs: Dict[str, Any]) -> ToolResult:
-        """
-        执行工具
-
-        Args:
-            inputs: 输入参数
-
-        Returns:
-            ToolResult: 执行结果
-        """
+        """执行工具"""
         pass
 
     async def validate_inputs(self, inputs: Dict[str, Any]) -> bool:
-        """
-        验证输入
-
-        Args:
-            inputs: 输入参数
-
-        Returns:
-            bool: 是否有效
-        """
+        """验证输入"""
         return True
 
     async def get_status(self) -> ToolStatus:

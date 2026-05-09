@@ -3,32 +3,22 @@ Tool Registry - 工具注册表
 """
 
 from typing import Dict, Optional, Type
-from .adapter import ToolAdapter, ToolStatus
+
+from .tool_adapter import ToolAdapter, ToolStatus
 
 
 class ToolRegistry:
+    """工具注册表
+
+    管理所有工具适配器。
+    使用模块级单例模式。
     """
-    工具注册表
 
-    用于注册和管理工具适配器。
-    """
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._tools = {}
-        return cls._instance
+    def __init__(self):
+        self._tools: Dict[str, ToolAdapter] = {}
 
     def register(self, name: str, adapter: ToolAdapter):
-        """
-        注册工具
-
-        Args:
-            name: 工具名称
-            adapter: 工具适配器实例
-        """
+        """注册工具"""
         self._tools[name] = adapter
 
     def unregister(self, name: str):
@@ -75,13 +65,13 @@ class ToolRegistry:
         return result
 
 
-# 全局注册表
-registry = ToolRegistry()
+# 模块级单例
+tool_registry = ToolRegistry()
 
 
 def register_tool(name: str):
     """装饰器：注册工具"""
     def decorator(cls: Type[ToolAdapter]):
-        registry.register(name, cls())
+        tool_registry.register(name, cls())
         return cls
     return decorator
